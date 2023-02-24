@@ -2,6 +2,7 @@ TEMPLATE = app
 TARGET = devtool
 
 QT = core network qml xml concurrent
+QT += core5compat
 
 include(../../installerfw.pri)
 

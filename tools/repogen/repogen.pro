@@ -6,6 +6,7 @@ include(../../installerfw.pri)
 
 QT -= gui
 QT += qml xml concurrent
+QT += core5compat
 
 CONFIG -= import_plugins
 

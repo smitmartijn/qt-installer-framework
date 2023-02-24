@@ -1,3 +1,5 @@
+QT += core5compat
+
 TEMPLATE = lib
 TARGET = installer
 INCLUDEPATH += . ..

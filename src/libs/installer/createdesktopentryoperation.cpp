@@ -27,10 +27,10 @@
 **************************************************************************/
 #include "createdesktopentryoperation.h"
 
+#include "adminauthorization.h"
 #include "errors.h"
 #include "fileutils.h"
 #include "globals.h"
-#include "adminauthorization.h"
 #include "remoteclient.h"
 
 #include <QDir>
@@ -46,155 +46,161 @@ using namespace QInstaller;
     \internal
 */
 
-QString CreateDesktopEntryOperation::absoluteFileName()
-{
-    const QString filename = arguments().first();
+QString CreateDesktopEntryOperation::absoluteFileName() {
+  const QString filename = arguments().first();
 
-    // give filename is already absolute
-    if (QFileInfo(filename).isAbsolute())
-        return filename;
+  // give filename is already absolute
+  if (QFileInfo(filename).isAbsolute())
+    return filename;
 
-    // we're not searching for the first time, let's re-use the old value
-    if (hasValue(QLatin1String("directory")))
-        return QDir(value(QLatin1String("directory")).toString()).absoluteFilePath(filename);
+  // we're not searching for the first time, let's re-use the old value
+  if (hasValue(QLatin1String("directory")))
+    return QDir(value(QLatin1String("directory")).toString())
+        .absoluteFilePath(filename);
 
-    QStringList XDG_DATA_HOME = QString::fromLocal8Bit(qgetenv("XDG_DATA_HOME"))
-                                                        .split(QLatin1Char(':'),
-        Qt::SkipEmptyParts);
+  QStringList XDG_DATA_HOME = QString::fromLocal8Bit(qgetenv("XDG_DATA_HOME"))
+                                  .split(QLatin1Char(':'), Qt::SkipEmptyParts);
 
-    XDG_DATA_HOME.push_back(QDir::home().absoluteFilePath(QLatin1String(".local/share"))); // default user-specific path
+  XDG_DATA_HOME.push_back(QDir::home().absoluteFilePath(
+      QLatin1String(".local/share"))); // default user-specific path
 
-    if (AdminAuthorization::hasAdminRights() || RemoteClient::instance().isActive())
-        XDG_DATA_HOME.push_front(QLatin1String("/usr/local/share")); // default system-wide path
+  if (AdminAuthorization::hasAdminRights() ||
+      RemoteClient::instance().isActive())
+    XDG_DATA_HOME.push_front(
+        QLatin1String("/usr/local/share")); // default system-wide path
 
-    const QStringList directories = XDG_DATA_HOME;
-    QString directory;
-    for (QStringList::const_iterator it = directories.begin(); it != directories.end(); ++it) {
-        if (it->isEmpty())
-            continue;
+  const QStringList directories = XDG_DATA_HOME;
+  QString directory;
+  for (QStringList::const_iterator it = directories.begin();
+       it != directories.end(); ++it) {
+    if (it->isEmpty())
+      continue;
 
-        directory = QDir(*it).absoluteFilePath(QLatin1String("applications"));
-        QDir dir(directory);
+    directory = QDir(*it).absoluteFilePath(QLatin1String("applications"));
+    QDir dir(directory);
 
-        // let's see whether this dir exists or we're able to create it
-        if (!dir.exists() && !QDir().mkpath(directory))
-            continue;
+    // let's see whether this dir exists or we're able to create it
+    if (!dir.exists() && !QDir().mkpath(directory))
+      continue;
 
-        // we just try whether we're able to open the file in ReadWrite
-        QFile file(QDir(directory).absoluteFilePath(filename));
-        const bool existed = file.exists();
-        if (!file.open(QIODevice::ReadWrite))
-            continue;
-        file.close();
-        if (!existed)
-            file.remove();
-        break;
-    }
+    // we just try whether we're able to open the file in ReadWrite
+    QFile file(QDir(directory).absoluteFilePath(filename));
+    const bool existed = file.exists();
+    if (!file.open(QIODevice::ReadWrite))
+      continue;
+    file.close();
+    if (!existed)
+      file.remove();
+    break;
+  }
 
-    if (!QDir(directory).exists())
-        QDir().mkpath(directory);
+  if (!QDir(directory).exists())
+    QDir().mkpath(directory);
 
-    setValue(QLatin1String("directory"), directory);
+  setValue(QLatin1String("directory"), directory);
 
-    return QDir(directory).absoluteFilePath(filename);
+  return QDir(directory).absoluteFilePath(filename);
 }
 
-CreateDesktopEntryOperation::CreateDesktopEntryOperation(PackageManagerCore *core)
-    : UpdateOperation(core)
-{
-    setName(QLatin1String("CreateDesktopEntry"));
+CreateDesktopEntryOperation::CreateDesktopEntryOperation(
+    PackageManagerCore *core)
+    : UpdateOperation(core) {
+  setName(QLatin1String("CreateDesktopEntry"));
 }
 
-CreateDesktopEntryOperation::~CreateDesktopEntryOperation()
-{
+CreateDesktopEntryOperation::~CreateDesktopEntryOperation() {}
+
+void CreateDesktopEntryOperation::backup() {
+  const QString filename = absoluteFileName();
+  QFile file(filename);
+
+  if (!file.exists())
+    return;
+
+  try {
+    setValue(QLatin1String("backupOfExistingDesktopEntry"),
+             generateTemporaryFileName(filename));
+  } catch (const QInstaller::Error &e) {
+    setErrorString(e.message());
+    return;
+  }
+
+  if (!file.copy(
+          value(QLatin1String("backupOfExistingDesktopEntry")).toString()))
+    setErrorString(
+        tr("Cannot backup file \"%1\": %2")
+            .arg(QDir::toNativeSeparators(filename), file.errorString()));
 }
 
-void CreateDesktopEntryOperation::backup()
-{
-    const QString filename = absoluteFileName();
-    QFile file(filename);
+bool CreateDesktopEntryOperation::performOperation() {
+  if (!checkArgumentCount(2))
+    return false;
 
-    if (!file.exists())
-        return;
+  const QString filename = absoluteFileName();
+  const QString &values = arguments().at(1);
 
-    try {
-        setValue(QLatin1String("backupOfExistingDesktopEntry"), generateTemporaryFileName(filename));
-    } catch (const QInstaller::Error &e) {
-        setErrorString(e.message());
-        return;
-    }
+  QFile file(filename);
+  if (file.exists() && !file.remove()) {
+    setError(UserDefinedError);
+    setErrorString(tr("Failed to overwrite file \"%1\".")
+                       .arg(QDir::toNativeSeparators(filename)));
+    return false;
+  }
 
-    if (!file.copy(value(QLatin1String("backupOfExistingDesktopEntry")).toString()))
-        setErrorString(tr("Cannot backup file \"%1\": %2").arg(QDir::toNativeSeparators(filename), file.errorString()));
+  if (!file.open(QIODevice::WriteOnly)) {
+    setError(UserDefinedError);
+    setErrorString(tr("Cannot write desktop entry to \"%1\".")
+                       .arg(QDir::toNativeSeparators(filename)));
+    return false;
+  }
+
+  setDefaultFilePermissions(filename, DefaultFilePermissions::Executable);
+
+  QTextStream stream(&file);
+  stream.setEncoding(QStringConverter::Utf8);
+  stream << QLatin1String("[Desktop Entry]") << Qt::endl;
+
+  // Type=Application\nExec=qtcreator\nPath=...
+  const QStringList pairs = values.split(QLatin1Char('\n'));
+  for (QStringList::const_iterator it = pairs.begin(); it != pairs.end(); ++it)
+    stream << *it << Qt::endl;
+
+  return true;
 }
 
-bool CreateDesktopEntryOperation::performOperation()
-{
-    if (!checkArgumentCount(2))
-        return false;
+bool CreateDesktopEntryOperation::undoOperation() {
+  const QString filename = absoluteFileName();
 
-    const QString filename = absoluteFileName();
-    const QString &values = arguments().at(1);
-
-    QFile file(filename);
-    if (file.exists() && !file.remove()) {
-        setError(UserDefinedError);
-        setErrorString(tr("Failed to overwrite file \"%1\".").arg(QDir::toNativeSeparators(filename)));
-        return false;
-    }
-
-    if(!file.open(QIODevice::WriteOnly)) {
-        setError(UserDefinedError);
-        setErrorString(tr("Cannot write desktop entry to \"%1\".").arg(QDir::toNativeSeparators(filename)));
-        return false;
-    }
-
-    setDefaultFilePermissions(filename, DefaultFilePermissions::Executable);
-
-    QTextStream stream(&file);
-    stream.setCodec("UTF-8");
-    stream << QLatin1String("[Desktop Entry]") << endl;
-
-    // Type=Application\nExec=qtcreator\nPath=...
-    const QStringList pairs = values.split(QLatin1Char('\n'));
-    for (QStringList::const_iterator it = pairs.begin(); it != pairs.end(); ++it)
-        stream << *it << Qt::endl;
-
+  // first remove the link
+  QFile file(filename);
+  if (file.exists() && !file.remove()) {
+    qCWarning(QInstaller::lcInstallerInstallLog)
+        << "Cannot delete file" << filename << ":" << file.errorString();
     return true;
-}
+  }
 
-bool CreateDesktopEntryOperation::undoOperation()
-{
-    const QString filename = absoluteFileName();
-
-    // first remove the link
-    QFile file(filename);
-    if (file.exists() && !file.remove()) {
-        qCWarning(QInstaller::lcInstallerInstallLog) << "Cannot delete file" << filename
-            << ":" << file.errorString();
-        return true;
-    }
-
-    if (!hasValue(QLatin1String("backupOfExistingDesktopEntry")))
-        return true;
-
-    QFile backupFile(value(QLatin1String("backupOfExistingDesktopEntry")).toString());
-    if (!backupFile.exists()) {
-        // do not treat this as a real error: The backup file might have been just nuked by the user.
-        qCWarning(QInstaller::lcInstallerInstallLog) << "Cannot restore original desktop entry at" << filename
-            << ": Backup file" << backupFile.fileName() << "does not exist anymore.";
-        return true;
-    }
-
-    if (!backupFile.rename(filename)) {
-        qCWarning(QInstaller::lcInstallerInstallLog) << "Cannot restore the file" << filename
-            << ":" << backupFile.errorString();
-    }
-
+  if (!hasValue(QLatin1String("backupOfExistingDesktopEntry")))
     return true;
+
+  QFile backupFile(
+      value(QLatin1String("backupOfExistingDesktopEntry")).toString());
+  if (!backupFile.exists()) {
+    // do not treat this as a real error: The backup file might have been just
+    // nuked by the user.
+    qCWarning(QInstaller::lcInstallerInstallLog)
+        << "Cannot restore original desktop entry at" << filename
+        << ": Backup file" << backupFile.fileName()
+        << "does not exist anymore.";
+    return true;
+  }
+
+  if (!backupFile.rename(filename)) {
+    qCWarning(QInstaller::lcInstallerInstallLog)
+        << "Cannot restore the file" << filename << ":"
+        << backupFile.errorString();
+  }
+
+  return true;
 }
 
-bool CreateDesktopEntryOperation::testOperation()
-{
-    return true;
-}
+bool CreateDesktopEntryOperation::testOperation() { return true; }

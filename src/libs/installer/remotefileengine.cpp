@@ -43,77 +43,70 @@ namespace QInstaller {
 
 // -- RemoteFileEngineHandler
 
-QAbstractFileEngine* RemoteFileEngineHandler::create(const QString &fileName) const
-{
-    if (!RemoteClient::instance().isActive())
-        return 0;
-
-    static const QRegularExpression re(QLatin1String("^[a-z0-9]*://.*$"));
-    if (re.match(fileName).hasMatch())  // stuff like installer://
-        return 0;
-
-    if (fileName.isEmpty() || fileName.startsWith(QLatin1String(":")))
-        return 0; // empty filename or Qt resource
-
-    QScopedPointer<RemoteFileEngine> client(new RemoteFileEngine());
-    client->setFileName(fileName);
-    if (client->isConnectedToServer())
-        return client.take();
+QAbstractFileEngine *
+RemoteFileEngineHandler::create(const QString &fileName) const {
+  if (!RemoteClient::instance().isActive())
     return 0;
-}
 
+  static const QRegularExpression re(QLatin1String("^[a-z0-9]*://.*$"));
+  if (re.match(fileName).hasMatch()) // stuff like installer://
+    return 0;
+
+  if (fileName.isEmpty() || fileName.startsWith(QLatin1String(":")))
+    return 0; // empty filename or Qt resource
+
+  QScopedPointer<RemoteFileEngine> client(new RemoteFileEngine());
+  client->setFileName(fileName);
+  if (client->isConnectedToServer())
+    return client.take();
+  return 0;
+}
 
 // -- RemoteFileEngineIterator
 
-class RemoteFileEngineIterator : public QAbstractFileEngineIterator
-{
+class RemoteFileEngineIterator : public QAbstractFileEngineIterator {
 public:
-    RemoteFileEngineIterator(QDir::Filters filters, const QStringList &nameFilters,
-            const QStringList &files)
-        : QAbstractFileEngineIterator(filters, nameFilters)
-        , index(-1)
-        , entries(files)
-    {
-    }
+  RemoteFileEngineIterator(QDir::Filters filters,
+                           const QStringList &nameFilters,
+                           const QStringList &files)
+      : QAbstractFileEngineIterator(filters, nameFilters), index(-1),
+        entries(files) {}
 
-    QString next();
-    bool hasNext() const;
-    QString currentFileName() const;
+  QString next();
+  bool hasNext() const;
+  QString currentFileName() const;
 
 private:
-    qint32 index;
-    QStringList entries;
+  qint32 index;
+  QStringList entries;
 };
 
 /*
-    Advances the iterator to the next entry, and returns the current file path of this new
-    entry. If hasNext() returns \c false, the function does nothing and returns an empty QString.
+    Advances the iterator to the next entry, and returns the current file path
+   of this new entry. If hasNext() returns \c false, the function does nothing
+   and returns an empty QString.
 */
-bool RemoteFileEngineIterator::hasNext() const
-{
-    return index < entries.size() - 1;
+bool RemoteFileEngineIterator::hasNext() const {
+  return index < entries.size() - 1;
 }
 
 /*
-    Returns \c true if there is at least one more entry in the directory, otherwise returns
-    \c false.
+    Returns \c true if there is at least one more entry in the directory,
+   otherwise returns \c false.
 */
-QString RemoteFileEngineIterator::next()
-{
-    if (!hasNext())
-        return QString();
-    ++index;
-    return currentFilePath();
+QString RemoteFileEngineIterator::next() {
+  if (!hasNext())
+    return QString();
+  ++index;
+  return currentFilePath();
 }
 
 /*
     Returns the name of the current directory entry, excluding the path.
 */
-QString RemoteFileEngineIterator::currentFileName() const
-{
-    return entries.at(index);
+QString RemoteFileEngineIterator::currentFileName() const {
+  return entries.at(index);
 }
-
 
 /*!
     \class QInstaller::RemoteFileEngine
@@ -121,427 +114,420 @@ QString RemoteFileEngineIterator::currentFileName() const
     \internal
 */
 RemoteFileEngine::RemoteFileEngine()
-    : RemoteObject(QLatin1String(Protocol::QAbstractFileEngine))
-{
-}
+    : RemoteObject(QLatin1String(Protocol::QAbstractFileEngine)) {}
 
-RemoteFileEngine::~RemoteFileEngine()
-{
-}
+RemoteFileEngine::~RemoteFileEngine() {}
 
 /*!
-*/
-bool RemoteFileEngine::atEnd() const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineAtEnd));
-    return m_fileEngine.atEnd();
+ */
+bool RemoteFileEngine::atEnd() const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineAtEnd));
+  return m_fileEngine.atEnd();
 }
 
 /*!
     \reimp
 */
-QAbstractFileEngine::Iterator* RemoteFileEngine::beginEntryList(QDir::Filters filters,
-    const QStringList &filterNames)
-{
-    if (connectToServer()) {
-        QStringList entries = entryList(filters, filterNames);
-        entries.removeAll(QString());
-        return new RemoteFileEngineIterator(filters, filterNames, entries);
-    }
-    return m_fileEngine.beginEntryList(filters, filterNames);
-
+QAbstractFileEngine::Iterator *
+RemoteFileEngine::beginEntryList(QDir::Filters filters,
+                                 const QStringList &filterNames) {
+  if (connectToServer()) {
+    QStringList entries = entryList(filters, filterNames);
+    entries.removeAll(QString());
+    return new RemoteFileEngineIterator(filters, filterNames, entries);
+  }
+  return m_fileEngine.beginEntryList(filters, filterNames);
 }
 
-QAbstractFileEngine::Iterator* RemoteFileEngine::endEntryList()
-{
-    if (connectToServer())
-        return 0;   // right now all other implementations return 0 too
-    return m_fileEngine.endEntryList();
-}
-
-/*!
-    \reimp
-*/
-bool RemoteFileEngine::caseSensitive() const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineCaseSensitive));
-    return m_fileEngine.caseSensitive();
+QAbstractFileEngine::Iterator *RemoteFileEngine::endEntryList() {
+  if (connectToServer())
+    return 0; // right now all other implementations return 0 too
+  return m_fileEngine.endEntryList();
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::close()
-{
-    if (connectToServer())
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineClose));
-    return m_fileEngine.close();
+bool RemoteFileEngine::caseSensitive() const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineCaseSensitive));
+  return m_fileEngine.caseSensitive();
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::copy(const QString &newName)
-{
-    if (connectToServer())
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineCopy), newName);
-    return m_fileEngine.copy(newName);
+bool RemoteFileEngine::close() {
+  if (connectToServer())
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineClose));
+  return m_fileEngine.close();
 }
 
 /*!
     \reimp
 */
-QStringList RemoteFileEngine::entryList(QDir::Filters filters, const QStringList &filterNames) const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
-        return callRemoteMethod<QStringList>
-            (QString::fromLatin1(Protocol::QAbstractFileEngineEntryList),
-            static_cast<qint32>(filters), filterNames);
-    }
-    return m_fileEngine.entryList(filters, filterNames);
-}
-
-/*!
-*/
-QFile::FileError RemoteFileEngine::error() const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
-        return static_cast<QFile::FileError>
-            (callRemoteMethod<qint32>(QString::fromLatin1(Protocol::QAbstractFileEngineError)));
-    }
-    return m_fileEngine.error();
-}
-
-/*!
-*/
-QString RemoteFileEngine::errorString() const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
-        return callRemoteMethod<QString>(QString::fromLatin1(Protocol::QAbstractFileEngineErrorString));
-    return m_fileEngine.errorString();
+bool RemoteFileEngine::copy(const QString &newName) {
+  if (connectToServer())
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineCopy), newName);
+  return m_fileEngine.copy(newName);
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::extension(Extension extension, const ExtensionOption *eo, ExtensionReturn *er)
-{
-    if (connectToServer())
-        return false;
-    return m_fileEngine.extension(extension, eo, er);
+QStringList RemoteFileEngine::entryList(QDir::Filters filters,
+                                        const QStringList &filterNames) const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
+    return callRemoteMethod<QStringList>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineEntryList),
+        static_cast<qint32>(filters), filterNames);
+  }
+  return m_fileEngine.entryList(filters, filterNames);
+}
+
+/*!
+ */
+QFile::FileError RemoteFileEngine::error() const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
+    return static_cast<QFile::FileError>(callRemoteMethod<qint32>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineError)));
+  }
+  return m_fileEngine.error();
+}
+
+/*!
+ */
+QString RemoteFileEngine::errorString() const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
+    return callRemoteMethod<QString>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineErrorString));
+  return m_fileEngine.errorString();
 }
 
 /*!
     \reimp
 */
-QAbstractFileEngine::FileFlags RemoteFileEngine::fileFlags(FileFlags type) const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
-        return static_cast<QAbstractFileEngine::FileFlags>
-            (callRemoteMethod<qint32>(QString::fromLatin1(Protocol::QAbstractFileEngineFileFlags),
-            static_cast<qint32>(type)));
-    }
-    return m_fileEngine.fileFlags(type);
+bool RemoteFileEngine::extension(Extension extension, const ExtensionOption *eo,
+                                 ExtensionReturn *er) {
+  if (connectToServer())
+    return false;
+  return m_fileEngine.extension(extension, eo, er);
 }
 
 /*!
     \reimp
 */
-QString RemoteFileEngine::fileName(FileName file) const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
-        return callRemoteMethod<QString>(QString::fromLatin1(Protocol::QAbstractFileEngineFileName),
-            static_cast<qint32>(file));
-    }
-    return m_fileEngine.fileName(file);
+QAbstractFileEngine::FileFlags
+RemoteFileEngine::fileFlags(FileFlags type) const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
+    return static_cast<QAbstractFileEngine::FileFlags>(callRemoteMethod<qint32>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineFileFlags),
+        static_cast<qint32>(type)));
+  }
+  return m_fileEngine.fileFlags(type);
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::flush()
-{
-    if (connectToServer())
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineFlush));
-    return m_fileEngine.flush();
+QString RemoteFileEngine::fileName(FileName file) const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
+    return callRemoteMethod<QString>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineFileName),
+        static_cast<qint32>(file));
+  }
+  return m_fileEngine.fileName(file);
 }
 
 /*!
     \reimp
 */
-int RemoteFileEngine::handle() const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
-        return callRemoteMethod<qint32>(QString::fromLatin1(Protocol::QAbstractFileEngineHandle));
-    return m_fileEngine.handle();
+bool RemoteFileEngine::flush() {
+  if (connectToServer())
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineFlush));
+  return m_fileEngine.flush();
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::isRelativePath() const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineIsRelativePath));
-    return m_fileEngine.isRelativePath();
+int RemoteFileEngine::handle() const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
+    return callRemoteMethod<qint32>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineHandle));
+  return m_fileEngine.handle();
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::isSequential() const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineIsSequential));
-    return m_fileEngine.isSequential();
+bool RemoteFileEngine::isRelativePath() const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineIsRelativePath));
+  return m_fileEngine.isRelativePath();
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::link(const QString &newName)
-{
-    if (connectToServer()) {
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineLink),
-            newName);
-    }
-    return m_fileEngine.link(newName);
+bool RemoteFileEngine::isSequential() const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineIsSequential));
+  return m_fileEngine.isSequential();
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::mkdir(const QString &dirName, bool createParentDirectories) const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineMkdir),
-            dirName, createParentDirectories);
-    }
-    return m_fileEngine.mkdir(dirName, createParentDirectories);
+bool RemoteFileEngine::link(const QString &newName) {
+  if (connectToServer()) {
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineLink), newName);
+  }
+  return m_fileEngine.link(newName);
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::open(QIODevice::OpenMode mode)
-{
-    if (connectToServer()) {
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineOpen),
-            static_cast<qint32>(mode | QIODevice::Unbuffered));
-    }
-    return m_fileEngine.open(mode | QIODevice::Unbuffered);
+bool RemoteFileEngine::mkdir(
+    const QString &dirName, bool createParentDirectories,
+    std::optional<QFileDevice::Permissions> permissions) const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineMkdir), dirName,
+        createParentDirectories);
+  }
+  return m_fileEngine.mkdir(dirName, createParentDirectories, permissions);
 }
 
 /*!
     \reimp
 */
-QString RemoteFileEngine::owner(FileOwner owner) const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
-        return callRemoteMethod<QString>(QString::fromLatin1(Protocol::QAbstractFileEngineOwner),
-            static_cast<qint32>(owner));
-    }
-    return m_fileEngine.owner(owner);
+bool RemoteFileEngine::open(
+    QIODevice::OpenMode mode,
+    std::optional<QFileDevice::Permissions> permissions) {
+  if (connectToServer()) {
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineOpen),
+        static_cast<qint32>(mode | QIODevice::Unbuffered));
+  }
+  return m_fileEngine.open(mode | QIODevice::Unbuffered, permissions);
 }
 
 /*!
     \reimp
 */
-uint RemoteFileEngine::ownerId(FileOwner owner) const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
-        return callRemoteMethod<quint32>(QString::fromLatin1(Protocol::QAbstractFileEngineOwnerId),
-            static_cast<qint32>(owner));
-    }
-    return m_fileEngine.ownerId(owner);
+QString RemoteFileEngine::owner(FileOwner owner) const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
+    return callRemoteMethod<QString>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineOwner),
+        static_cast<qint32>(owner));
+  }
+  return m_fileEngine.owner(owner);
 }
 
 /*!
     \reimp
 */
-qint64 RemoteFileEngine::pos() const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
-        return callRemoteMethod<qint64>(QString::fromLatin1(Protocol::QAbstractFileEnginePos));
-    return m_fileEngine.pos();
+uint RemoteFileEngine::ownerId(FileOwner owner) const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
+    return callRemoteMethod<quint32>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineOwnerId),
+        static_cast<qint32>(owner));
+  }
+  return m_fileEngine.ownerId(owner);
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::remove()
-{
-    if (connectToServer())
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineRemove));
-    return m_fileEngine.remove();
+qint64 RemoteFileEngine::pos() const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
+    return callRemoteMethod<qint64>(
+        QString::fromLatin1(Protocol::QAbstractFileEnginePos));
+  return m_fileEngine.pos();
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::rename(const QString &newName)
-{
-    if (connectToServer()) {
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineRename),
-            newName);
-    }
-    return m_fileEngine.rename(newName);
+bool RemoteFileEngine::remove() {
+  if (connectToServer())
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineRemove));
+  return m_fileEngine.remove();
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::rmdir(const QString &dirName, bool recurseParentDirectories) const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineRmdir),
-            dirName, recurseParentDirectories);
-    }
-    return m_fileEngine.rmdir(dirName, recurseParentDirectories);
+bool RemoteFileEngine::rename(const QString &newName) {
+  if (connectToServer()) {
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineRename), newName);
+  }
+  return m_fileEngine.rename(newName);
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::seek(qint64 offset)
-{
-    if (connectToServer())
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineSeek), offset);
-    return m_fileEngine.seek(offset);
+bool RemoteFileEngine::rmdir(const QString &dirName,
+                             bool recurseParentDirectories) const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineRmdir), dirName,
+        recurseParentDirectories);
+  }
+  return m_fileEngine.rmdir(dirName, recurseParentDirectories);
 }
 
 /*!
     \reimp
 */
-void RemoteFileEngine::setFileName(const QString &fileName)
-{
-    if (connectToServer()) {
-        callRemoteMethod(QString::fromLatin1(Protocol::QAbstractFileEngineSetFileName), fileName,
-            dummy);
-    }
-    m_fileEngine.setFileName(fileName);
+bool RemoteFileEngine::seek(qint64 offset) {
+  if (connectToServer())
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineSeek), offset);
+  return m_fileEngine.seek(offset);
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::setPermissions(uint perms)
-{
-    if (connectToServer()) {
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineSetPermissions),
-            perms);
-    }
-    return m_fileEngine.setPermissions(perms);
+void RemoteFileEngine::setFileName(const QString &fileName) {
+  if (connectToServer()) {
+    callRemoteMethod(
+        QString::fromLatin1(Protocol::QAbstractFileEngineSetFileName), fileName,
+        dummy);
+  }
+  m_fileEngine.setFileName(fileName);
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::setSize(qint64 size)
-{
-    if (connectToServer()) {
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineSetSize),
-            size);
-    }
-    return m_fileEngine.setSize(size);
+bool RemoteFileEngine::setPermissions(uint perms) {
+  if (connectToServer()) {
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineSetPermissions),
+        perms);
+  }
+  return m_fileEngine.setPermissions(perms);
 }
 
 /*!
     \reimp
 */
-qint64 RemoteFileEngine::size() const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
-        return callRemoteMethod<qint64>(QString::fromLatin1(Protocol::QAbstractFileEngineSize));
-    return m_fileEngine.size();
+bool RemoteFileEngine::setSize(qint64 size) {
+  if (connectToServer()) {
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineSetSize), size);
+  }
+  return m_fileEngine.setSize(size);
 }
 
 /*!
     \reimp
 */
-bool RemoteFileEngine::supportsExtension(Extension extension) const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
-        return false;
-    return m_fileEngine.supportsExtension(extension);
+qint64 RemoteFileEngine::size() const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
+    return callRemoteMethod<qint64>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineSize));
+  return m_fileEngine.size();
 }
 
 /*!
     \reimp
 */
-qint64 RemoteFileEngine::read(char *data, qint64 maxlen)
-{
-    if (connectToServer()) {
-        QPair<qint64, QByteArray> result = callRemoteMethod<QPair<qint64, QByteArray> >
-            (QString::fromLatin1(Protocol::QAbstractFileEngineRead), maxlen);
-
-        if (result.first <= 0)
-            return result.first;
-
-        QDataStream dataStream(result.second);
-        dataStream.readRawData(data, result.first);
-        return result.first;
-    }
-    return m_fileEngine.read(data, maxlen);
+bool RemoteFileEngine::supportsExtension(Extension extension) const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer())
+    return false;
+  return m_fileEngine.supportsExtension(extension);
 }
 
 /*!
     \reimp
 */
-qint64 RemoteFileEngine::readLine(char *data, qint64 maxlen)
-{
-    if (connectToServer()) {
-        QPair<qint64, QByteArray> result = callRemoteMethod<QPair<qint64, QByteArray> >
-            (QString::fromLatin1(Protocol::QAbstractFileEngineReadLine), maxlen);
+qint64 RemoteFileEngine::read(char *data, qint64 maxlen) {
+  if (connectToServer()) {
+    QPair<qint64, QByteArray> result =
+        callRemoteMethod<QPair<qint64, QByteArray>>(
+            QString::fromLatin1(Protocol::QAbstractFileEngineRead), maxlen);
 
-        if (result.first <= 0)
-            return result.first;
+    if (result.first <= 0)
+      return result.first;
 
-        QDataStream dataStream(result.second);
-        dataStream.readRawData(data, result.first);
-        return result.first;
-    }
-    return m_fileEngine.readLine(data, maxlen);
+    QDataStream dataStream(result.second);
+    dataStream.readRawData(data, result.first);
+    return result.first;
+  }
+  return m_fileEngine.read(data, maxlen);
 }
 
 /*!
     \reimp
 */
-qint64 RemoteFileEngine::write(const char *data, qint64 len)
-{
-    if (connectToServer()) {
-        QByteArray ba(data, len);
-        return callRemoteMethod<qint64>(QString::fromLatin1(Protocol::QAbstractFileEngineWrite), ba);
-    }
-    return m_fileEngine.write(data, len);
+qint64 RemoteFileEngine::readLine(char *data, qint64 maxlen) {
+  if (connectToServer()) {
+    QPair<qint64, QByteArray> result =
+        callRemoteMethod<QPair<qint64, QByteArray>>(
+            QString::fromLatin1(Protocol::QAbstractFileEngineReadLine), maxlen);
+
+    if (result.first <= 0)
+      return result.first;
+
+    QDataStream dataStream(result.second);
+    dataStream.readRawData(data, result.first);
+    return result.first;
+  }
+  return m_fileEngine.readLine(data, maxlen);
 }
 
-bool RemoteFileEngine::syncToDisk()
-{
-    if (connectToServer())
-        return callRemoteMethod<bool>(QString::fromLatin1(Protocol::QAbstractFileEngineSyncToDisk));
-    return m_fileEngine.syncToDisk();
+/*!
+    \reimp
+*/
+qint64 RemoteFileEngine::write(const char *data, qint64 len) {
+  if (connectToServer()) {
+    QByteArray ba(data, len);
+    return callRemoteMethod<qint64>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineWrite), ba);
+  }
+  return m_fileEngine.write(data, len);
 }
 
-bool RemoteFileEngine::renameOverwrite(const QString &newName)
-{
-    if (connectToServer()) {
-        return callRemoteMethod<bool>
-            (QString::fromLatin1(Protocol::QAbstractFileEngineRenameOverwrite), newName);
-    }
-    return m_fileEngine.renameOverwrite(newName);
+bool RemoteFileEngine::syncToDisk() {
+  if (connectToServer())
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineSyncToDisk));
+  return m_fileEngine.syncToDisk();
 }
 
-QDateTime RemoteFileEngine::fileTime(FileTime time) const
-{
-    if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
-        return callRemoteMethod<QDateTime>
-            (QString::fromLatin1(Protocol::QAbstractFileEngineFileTime),
-            static_cast<qint32> (time));
-    }
-    return m_fileEngine.fileTime(time);
+bool RemoteFileEngine::renameOverwrite(const QString &newName) {
+  if (connectToServer()) {
+    return callRemoteMethod<bool>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineRenameOverwrite),
+        newName);
+  }
+  return m_fileEngine.renameOverwrite(newName);
+}
+
+QDateTime RemoteFileEngine::fileTime(FileTime time) const {
+  if ((const_cast<RemoteFileEngine *>(this))->connectToServer()) {
+    return callRemoteMethod<QDateTime>(
+        QString::fromLatin1(Protocol::QAbstractFileEngineFileTime),
+        static_cast<qint32>(time));
+  }
+  return m_fileEngine.fileTime(time);
 }
 
 } // namespace QInstaller

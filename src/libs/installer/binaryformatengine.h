@@ -35,37 +35,40 @@
 
 namespace QInstaller {
 
-class BinaryFormatEngine : public QAbstractFileEngine
-{
-    Q_DISABLE_COPY(BinaryFormatEngine)
+class BinaryFormatEngine : public QAbstractFileEngine {
+  Q_DISABLE_COPY(BinaryFormatEngine)
 
 public:
-    BinaryFormatEngine(const QHash<QByteArray, ResourceCollection> &collections,
-        const QString &fileName);
+  BinaryFormatEngine(const QHash<QByteArray, ResourceCollection> &collections,
+                     const QString &fileName);
 
-    void setFileName(const QString &file) override;
+  void setFileName(const QString &file) override;
 
-    bool copy(const QString &newName) override;
-    bool close() override;
-    bool open(QIODevice::OpenMode mode) override;
-    qint64 pos() const override;
-    qint64 read(char *data, qint64 maxlen) override;
-    bool seek(qint64 offset) override;
-    qint64 size() const override;
+  bool copy(const QString &newName) override;
+  bool close() override;
+  bool
+  open(QIODevice::OpenMode mode,
+       std::optional<QFile::Permissions> permissions = std::nullopt) override;
+  qint64 pos() const override;
+  qint64 read(char *data, qint64 maxlen) override;
+  bool seek(qint64 offset) override;
+  qint64 size() const override;
 
-    QString fileName(FileName file = DefaultName) const override;
-    FileFlags fileFlags(FileFlags type = FileInfoAll) const override;
+  QString fileName(FileName file = DefaultName) const override;
+  FileFlags fileFlags(FileFlags type = FileInfoAll) const override;
 
-    Iterator *beginEntryList(QDir::Filters filters, const QStringList &filterNames) override;
-    QStringList entryList(QDir::Filters filters, const QStringList &filterNames) const override;
+  Iterator *beginEntryList(QDir::Filters filters,
+                           const QStringList &filterNames) override;
+  QStringList entryList(QDir::Filters filters,
+                        const QStringList &filterNames) const override;
 
 private:
-    QString m_fileNamePath;
+  QString m_fileNamePath;
 
-    ResourceCollection m_collection;
-    QSharedPointer<Resource> m_resource;
+  ResourceCollection m_collection;
+  QSharedPointer<Resource> m_resource;
 
-    QHash<QByteArray, ResourceCollection> m_collections;
+  QHash<QByteArray, ResourceCollection> m_collections;
 };
 
 } // namespace QInstaller

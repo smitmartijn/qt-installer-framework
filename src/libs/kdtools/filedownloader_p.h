@@ -32,115 +32,115 @@
 
 #include "filedownloader.h"
 
-#include <QtNetwork/QNetworkReply>
 #include <QNetworkAccessManager>
+#include <QNetworkInformation>
+#include <QtNetwork/QNetworkReply>
 
 // these classes are not a part of the public API
 
 namespace KDUpdater {
 
-class LocalFileDownloader : public FileDownloader
-{
-    Q_OBJECT
+class LocalFileDownloader : public FileDownloader {
+  Q_OBJECT
 
 public:
-    explicit LocalFileDownloader(QObject *parent = 0);
-    ~LocalFileDownloader();
+  explicit LocalFileDownloader(QObject *parent = 0);
+  ~LocalFileDownloader();
 
-    bool canDownload() const override;
-    bool isDownloaded() const override;
-    QString downloadedFileName() const override;
-    void setDownloadedFileName(const QString &name) override;
-    LocalFileDownloader *clone(QObject *parent = 0) const override;
+  bool canDownload() const override;
+  bool isDownloaded() const override;
+  QString downloadedFileName() const override;
+  void setDownloadedFileName(const QString &name) override;
+  LocalFileDownloader *clone(QObject *parent = 0) const override;
 
 public Q_SLOTS:
-    void cancelDownload() override;
+  void cancelDownload() override;
 
 protected:
-    void timerEvent(QTimerEvent *te) override;
-    void onError() override;
-    void onSuccess() override;
+  void timerEvent(QTimerEvent *te) override;
+  void onError() override;
+  void onSuccess() override;
 
 private Q_SLOTS:
-    void doDownload() override;
+  void doDownload() override;
 
 private:
-    struct Private;
-    Private *d;
+  struct Private;
+  Private *d;
 };
 
-class ResourceFileDownloader : public FileDownloader
-{
-    Q_OBJECT
+class ResourceFileDownloader : public FileDownloader {
+  Q_OBJECT
 
 public:
-    explicit ResourceFileDownloader(QObject *parent = 0);
-    ~ResourceFileDownloader();
+  explicit ResourceFileDownloader(QObject *parent = 0);
+  ~ResourceFileDownloader();
 
-    bool canDownload() const override;
-    bool isDownloaded() const override;
-    QString downloadedFileName() const override;
-    void setDownloadedFileName(const QString &name) override;
-    ResourceFileDownloader *clone(QObject *parent = 0) const override;
+  bool canDownload() const override;
+  bool isDownloaded() const override;
+  QString downloadedFileName() const override;
+  void setDownloadedFileName(const QString &name) override;
+  ResourceFileDownloader *clone(QObject *parent = 0) const override;
 
 public Q_SLOTS:
-    void cancelDownload() override;
+  void cancelDownload() override;
 
 protected:
-    void timerEvent(QTimerEvent *te) override;
-    void onError() override;
-    void onSuccess() override;
+  void timerEvent(QTimerEvent *te) override;
+  void onError() override;
+  void onSuccess() override;
 
 private Q_SLOTS:
-    void doDownload() override;
+  void doDownload() override;
 
 private:
-    struct Private;
-    Private *d;
+  struct Private;
+  Private *d;
 };
 
-class HttpDownloader : public FileDownloader
-{
-    Q_OBJECT
+class HttpDownloader : public FileDownloader {
+  Q_OBJECT
 
 public:
-    explicit HttpDownloader(QObject *parent = 0);
-    ~HttpDownloader();
+  explicit HttpDownloader(QObject *parent = 0);
+  ~HttpDownloader();
 
-    bool canDownload() const override;
-    bool isDownloaded() const override;
-    QString downloadedFileName() const override;
-    void setDownloadedFileName(const QString &name) override;
-    HttpDownloader *clone(QObject *parent = 0) const override;
+  bool canDownload() const override;
+  bool isDownloaded() const override;
+  QString downloadedFileName() const override;
+  void setDownloadedFileName(const QString &name) override;
+  HttpDownloader *clone(QObject *parent = 0) const override;
 
 public Q_SLOTS:
-    void cancelDownload() override;
+  void cancelDownload() override;
 
 protected:
-    void onError() override;
-    void onSuccess() override;
-    void timerEvent(QTimerEvent *event) override;
+  void onError() override;
+  void onSuccess() override;
+  void timerEvent(QTimerEvent *event) override;
 
 private Q_SLOTS:
-    void doDownload() override;
+  void doDownload() override;
 
-    void httpReadyRead();
-    void httpReadProgress(qint64 done, qint64 total);
-    void httpError(QNetworkReply::NetworkError);
-    void httpDone(bool error);
-    void httpReqFinished();
-    void onAuthenticationRequired(QNetworkReply *reply, QAuthenticator *authenticator);
-    void onNetworkAccessibleChanged(QNetworkAccessManager::NetworkAccessibility accessible);
+  void httpReadyRead();
+  void httpReadProgress(qint64 done, qint64 total);
+  void httpError(QNetworkReply::NetworkError);
+  void httpDone(bool error);
+  void httpReqFinished();
+  void onAuthenticationRequired(QNetworkReply *reply,
+                                QAuthenticator *authenticator);
+  void onNetworkReachabilityChanged(
+      QNetworkInformation::Reachability newReachability);
 #ifndef QT_NO_SSL
-    void onSslErrors(QNetworkReply* reply, const QList<QSslError> &errors);
+  void onSslErrors(QNetworkReply *reply, const QList<QSslError> &errors);
 #endif
 private:
-    void startDownload(const QUrl &url);
-    void resumeDownload();
+  void startDownload(const QUrl &url);
+  void resumeDownload();
 
 private:
-    struct Private;
-    Private *d;
+  struct Private;
+  Private *d;
 };
 
 } // namespace KDUpdater

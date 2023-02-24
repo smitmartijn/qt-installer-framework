@@ -1,3 +1,4 @@
+QT += core5compat
 TEMPLATE = subdirs
 SUBDIRS += src tools doc
 tools.depends = src
@@ -24,3 +25,4 @@ isEmpty(BUILD_EXAMPLES):BUILD_EXAMPLES=$${BUILDEXAMPLES}
     message("Cannot build Qt Installer Framework with Qt version $${QT_VERSION}.")
     error("Use at least Qt 5.15.2.")
 }
+

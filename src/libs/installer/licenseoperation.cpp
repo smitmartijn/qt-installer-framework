@@ -28,9 +28,9 @@
 
 #include "licenseoperation.h"
 
+#include "fileutils.h"
 #include "packagemanagercore.h"
 #include "settings.h"
-#include "fileutils.h"
 
 #include <QtCore/QDir>
 #include <QtCore/QFile>
@@ -45,75 +45,71 @@ using namespace QInstaller;
 */
 
 LicenseOperation::LicenseOperation(PackageManagerCore *core)
-    : UpdateOperation(core)
-{
-    setName(QLatin1String("License"));
+    : UpdateOperation(core) {
+  setName(QLatin1String("License"));
 }
 
-void LicenseOperation::backup()
-{
-}
+void LicenseOperation::backup() {}
 
-bool LicenseOperation::performOperation()
-{
-    QVariantMap licenses = value(scLicenses).toMap();
-    if (licenses.isEmpty()) {
-        setError(UserDefinedError);
-        setErrorString(tr("No license files found to copy."));
-        return false;
+bool LicenseOperation::performOperation() {
+  QVariantMap licenses = value(scLicenses).toMap();
+  if (licenses.isEmpty()) {
+    setError(UserDefinedError);
+    setErrorString(tr("No license files found to copy."));
+    return false;
+  }
+
+  PackageManagerCore *const core = packageManager();
+  if (!core) {
+    setError(UserDefinedError);
+    setErrorString(
+        tr("Needed installer object in %1 operation is empty.").arg(name()));
+    return false;
+  }
+
+  QString targetDir = QString::fromLatin1("%1%2%3").arg(
+      core->value(scTargetDir), QDir::separator(), QLatin1String("Licenses"));
+
+  QDir dir;
+  dir.mkpath(targetDir);
+  setDefaultFilePermissions(targetDir, DefaultFilePermissions::Executable);
+  setArguments(QStringList(targetDir));
+
+  for (QVariantMap::const_iterator it = licenses.constBegin();
+       it != licenses.constEnd(); ++it) {
+    QFile file(targetDir + QLatin1Char('/') + it.key());
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+      setError(UserDefinedError);
+      setErrorString(tr("Can not write license file \"%1\".")
+                         .arg(QDir::toNativeSeparators(file.fileName())));
+      return false;
     }
 
-    PackageManagerCore *const core = packageManager();
-    if (!core) {
-        setError( UserDefinedError );
-        setErrorString(tr("Needed installer object in %1 operation is empty.").arg(name()));
-        return false;
-    }
+    QTextStream stream(&file);
+    stream.setEncoding(QStringConverter::Utf8);
+    stream << it.value().toString();
+  }
 
-    QString targetDir = QString::fromLatin1("%1%2%3").arg(core->value(scTargetDir),
-        QDir::separator(), QLatin1String("Licenses"));
-
-    QDir dir;
-    dir.mkpath(targetDir);
-    setDefaultFilePermissions(targetDir, DefaultFilePermissions::Executable);
-    setArguments(QStringList(targetDir));
-
-    for (QVariantMap::const_iterator it = licenses.constBegin(); it != licenses.constEnd(); ++it) {
-        QFile file(targetDir + QLatin1Char('/') + it.key());
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            setError(UserDefinedError);
-            setErrorString(tr("Can not write license file \"%1\".").arg(QDir::toNativeSeparators(file.fileName())));
-            return false;
-        }
-
-        QTextStream stream(&file);
-        stream.setCodec("UTF-8");
-        stream << it.value().toString();
-    }
-
-    return true;
+  return true;
 }
 
-bool LicenseOperation::undoOperation()
-{
-    const QVariantMap licenses = value(scLicenses).toMap();
-    if (licenses.isEmpty()) {
-        setError(UserDefinedError);
-        setErrorString(tr("No license files found to delete."));
-        return false;
-    }
+bool LicenseOperation::undoOperation() {
+  const QVariantMap licenses = value(scLicenses).toMap();
+  if (licenses.isEmpty()) {
+    setError(UserDefinedError);
+    setErrorString(tr("No license files found to delete."));
+    return false;
+  }
 
-    QString targetDir = arguments().value(0);
-    for (QVariantMap::const_iterator it = licenses.begin(); it != licenses.end(); ++it)
-        QFile::remove(targetDir + QDir::separator() + it.key());
+  QString targetDir = arguments().value(0);
+  for (QVariantMap::const_iterator it = licenses.begin(); it != licenses.end();
+       ++it)
+    QFile::remove(targetDir + QDir::separator() + it.key());
 
-    QDir dir;
-    dir.rmdir(targetDir);
+  QDir dir;
+  dir.rmdir(targetDir);
 
-    return true;
+  return true;
 }
 
-bool LicenseOperation::testOperation()
-{
-    return true;
-}
+bool LicenseOperation::testOperation() { return true; }
